@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ComfyUI Asset Manager Pro v6.0</title>
+  <style>
+    :root { 
+      background: #0d1117; color: #c9d1d9; font-family: system-ui, sans-serif; 
+      --thumb-size: 250px; 
+    }
+    body { display: flex; height: 100vh; margin: 0; overflow: hidden; }
+    
+    /* Layout */
+    #sidebar-left {
+      width: 250px; background: #161b22; padding: 20px; overflow-y: auto;
+      border-right: 1px solid #30363d; display: flex; flex-direction: column; gap: 15px;
+      z-index: 10;
+    }
+    #main-wrapper {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+    }
+    #header {
+      background: #161b22; border-bottom: 1px solid #30363d;
+      display: flex; align-items: center; padding: 12px 20px; gap: 10px; flex-wrap: wrap;
+    }
+    
+    #gallery { flex: 1; padding: 20px; overflow-y: auto; overflow-x: hidden; }
+    #masonry-container { column-width: var(--thumb-size); column-gap: 15px; width: 100%; }
+    
+    #sidebar-right { 
+      width: 350px; background: #161b22; padding: 20px; overflow-y: auto; 
+      border-left: 1px solid #30363d; display: flex; flex-direction: column; gap: 15px;
+      z-index: 10;
+    }
+    
+    /* Header Controls */
+    input[type="text"], select {
+      background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; 
+      padding: 6px 10px; border-radius: 6px; font-size: 13px; outline: none;
+      max-width: 150px; text-overflow: ellipsis;
+    }
+    input[type="text"]:focus, select:focus { border-color: #58a6ff; }
+    input[type="text"] { flex: 1; max-width: 250px; min-width: 150px; }
+    
+    .slider-container { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #8b949e; font-weight: bold; margin-left: auto;}
+    input[type="range"] { accent-color: #58a6ff; cursor: pointer; }
+
+    /* UI Elements */
+    .btn { 
+      background: #238636; color: white; border: none; padding: 10px; 
+      border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; font-size: 14px;
+    }
+    .btn:hover { background: #2ea043; }
+    .btn.danger { background: #da3633; }
+    .btn.danger:hover { background: #f85149; }
+    
+    /* Folder Tree */
+    .tree-root { list-style: none; padding: 0; margin: 0; font-size: 14px; }
+    .tree-node { list-style: none; padding-left: 15px; margin: 5px 0; }
+    .folder-item { 
+      cursor: pointer; padding: 6px; border-radius: 4px; display: block; 
+      color: #8b949e; transition: 0.1s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .folder-item:hover { background: #21262d; color: #c9d1d9; }
+    .folder-item.active-folder { background: #1f6feb; color: white; font-weight: bold; }
+    
+    /* Gallery Cards */
+    .img-card { 
+      cursor: pointer; border-radius: 8px; overflow: hidden; background: #21262d; 
+      border: 2px solid transparent; transition: 0.1s ease; position: relative;
+      break-inside: avoid; margin-bottom: 15px; display: inline-block; width: 100%;
+    }
+    .img-card.active { border-color: #58a6ff; } /* Blue border for metadata viewing */
+    .img-card.bulk-selected { border-color: #2ea043; } /* Green border for bulk selection */
+    .img-card img { width: 100%; height: auto; display: block; }
+    
+    /* Bulk Checkbox Overlay */
+    .checkbox-container {
+      position: absolute; top: 8px; right: 8px; z-index: 5;
+      background: rgba(13, 17, 23, 0.75); border-radius: 4px; padding: 5px;
+      display: flex; align-items: center; justify-content: center;
+      transition: 0.1s;
+    }
+    .checkbox-container:hover { background: rgba(13, 17, 23, 0.95); }
+    .bulk-check { width: 18px; height: 18px; cursor: pointer; accent-color: #2ea043; margin: 0; }
+    
+    /* Metadata Box */
+    .meta-box { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+    .meta-label { font-size: 11px; text-transform: uppercase; color: #8b949e; margin-bottom: 5px; font-weight: bold; display: flex; justify-content: space-between; }
+    .meta-value { font-size: 13px; white-space: pre-wrap; line-height: 1.4; word-break: break-word; }
+    .copy-btn { cursor: pointer; color: #58a6ff; transition: 0.1s; }
+    .copy-btn:hover { color: #79c0ff; }
+    .action-row { display: flex; gap: 10px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <div id="sidebar-left">
+    <button id="openBtn" class="btn">📂 Select Root Folder</button>
+    <div style="border-bottom: 1px solid #30363d; margin: 5px 0;"></div>
+    <div style="font-size: 12px; color: #8b949e; text-transform: uppercase; font-weight: bold;">Directory Tree</div>
+    <ul id="folderTree" class="tree-root"></ul>
+  </div>
+
+  <div id="main-wrapper">
+    <div id="header">
+      <input type="text" id="searchInput" placeholder="Search prompts, seeds...">
+      <select id="dateSelect"><option value="all">All Dates</option></select>
+      <select id="modelSelect"><option value="all">All Models</option></select>
+      <select id="loraSelect"><option value="all">All LoRAs</option></select>
+      <select id="samplerSelect"><option value="all">All Samplers</option></select>
+      <select id="schedulerSelect"><option value="all">All Schedulers</option></select>
+      
+      <div class="slider-container">
+        <span>Size</span>
+        <input type="range" id="sizeSlider" min="150" max="800" value="250">
+        <span id="statusText" style="margin-left: 10px;"></span>
+      </div>
+    </div>
+    
+    <div id="gallery">
+      <div id="masonry-container"></div>
+    </div>
+  </div>
+
+  <div id="sidebar-right">
+    <div id="fileActions" style="display: none;">
+      <h3 id="currentFileName" style="margin: 0 0 10px 0; font-size: 15px; word-break: break-all;">No Image Selected</h3>
+      <div class="action-row">
+        <button id="btnKeep" class="btn">⭐ Keep</button>
+        <button id="btnTrash" class="btn danger">🗑️ Trash</button>
+      </div>
+      <div style="border-bottom: 1px solid #30363d; margin: 15px 0;"></div>
+    </div>
+    <div id="metaContent">
+      <div style="color: #8b949e; text-align: center; margin-top: 50px;">Select an image to view generation data.</div>
+    </div>
+  </div>
+
+  <script>
+    let rootDirHandle = null;
+    let currentViewDirHandle = null; 
+    let currentFileHandle = null;
+    let currentFolderImages = []; 
+    let selectedImages = new Set(); // Tracks bulk selections
+
+    function escapeHTML(str) {
+      return String(str).replace(/[&<>'"]/g, match => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[match]));
+    }
+
+    document.getElementById('sizeSlider').addEventListener('input', (e) => {
+      document.documentElement.style.setProperty('--thumb-size', e.target.value + 'px');
+    });
+
+    document.getElementById('openBtn').addEventListener('click', async () => {
+      try {
+        rootDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        const treeContainer = document.getElementById('folderTree');
+        treeContainer.innerHTML = '';
+        
+        const rootLi = document.createElement('li');
+        const rootSpan = document.createElement('span');
+        rootSpan.innerText = '🏠 Root: ' + rootDirHandle.name;
+        rootSpan.className = 'folder-item active-folder';
+        rootSpan.onclick = () => switchFolderView(rootDirHandle, rootSpan);
+        rootLi.appendChild(rootSpan);
+        treeContainer.appendChild(rootLi);
+
+        await buildFolderTree(rootDirHandle, rootLi);
+        await switchFolderView(rootDirHandle, rootSpan);
+      } catch (e) {
+        if (e.name !== 'AbortError') alert("Permission denied: " + e.message);
+      }
+    });
+
+    async function buildFolderTree(dirHandle, parentElement) {
+      const ul = document.createElement('ul');
+      ul.className = 'tree-node';
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'directory') {
+          const li = document.createElement('li');
+          const span = document.createElement('span');
+          span.innerText = '📁 ' + entry.name;
+          span.className = 'folder-item';
+          span.onclick = (e) => { e.stopPropagation(); switchFolderView(entry, span); };
+          li.appendChild(span);
+          await buildFolderTree(entry, li);
+          ul.appendChild(li);
+        }
+      }
+      if (ul.childNodes.length > 0) parentElement.appendChild(ul);
+    }
+
+    async function switchFolderView(dirHandle, spanElement) {
+      document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active-folder'));
+      spanElement.classList.add('active-folder');
+      currentViewDirHandle = dirHandle;
+      document.getElementById('searchInput').value = '';
+      selectedImages.clear(); // Clear bulk selections on folder change
+      updateActionUI();
+      await renderGalleryAndIndex(dirHandle);
+    }
+
+    async function renderGalleryAndIndex(dirHandle) {
+      const masonry = document.getElementById('masonry-container');
+      const statusText = document.getElementById('statusText');
+      
+      masonry.innerHTML = ''; 
+      currentFolderImages = [];
+      let uniqueModels = new Set(), uniqueLoras = new Set(), uniqueDates = new Set(), uniqueSamplers = new Set(), uniqueSchedulers = new Set();
+      
+      statusText.innerText = 'Indexing...';
+      document.getElementById('metaContent').innerHTML = '<div style="color: #8b949e; text-align: center; margin-top: 50px;">Select an image to view generation data.</div>';
+      
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.png')) {
+          const file = await entry.getFile();
+          const url = URL.createObjectURL(file);
+          const fileDate = new Date(file.lastModified).toISOString().split('T')[0];
+          uniqueDates.add(fileDate);
+
+          const rawMetadata = await extractComfyMetadata(file);
+          const parsedData = parseCleanMetadata(rawMetadata.prompt);
+          
+          if (parsedData.modelName !== "Unknown Model") uniqueModels.add(parsedData.modelName);
+          if (parsedData.sampler !== "Unknown") uniqueSamplers.add(parsedData.sampler);
+          if (parsedData.scheduler !== "Unknown") uniqueSchedulers.add(parsedData.scheduler);
+          parsedData.rawLorAs.forEach(lora => uniqueLoras.add(lora));
+
+          const card = document.createElement('div');
+          card.className = 'img-card';
+          // Added Checkbox UI
+          card.innerHTML = `
+            <div class="checkbox-container" onclick="event.stopPropagation()">
+              <input type="checkbox" class="bulk-check">
+            </div>
+            <img src="${url}" loading="lazy">
+          `;
+          
+          const imgData = {
+            fileHandle: entry, cardElement: card, parsedData: parsedData, date: fileDate,
+            searchString: `${parsedData.posText} ${parsedData.negText} ${parsedData.seed}`.toLowerCase(),
+          };
+
+          // Bulk Select Event Logic
+          const checkbox = card.querySelector('.bulk-check');
+          checkbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+              selectedImages.add(imgData);
+              card.classList.add('bulk-selected');
+            } else {
+              selectedImages.delete(imgData);
+              card.classList.remove('bulk-selected');
+            }
+            updateActionUI();
+          });
+
+          card.onclick = () => selectImage(card, imgData);
+          masonry.appendChild(card);
+          currentFolderImages.push(imgData);
+        }
+      }
+
+      const populateDropdown = (id, defaultText, items) => {
+        const select = document.getElementById(id);
+        select.innerHTML = `<option value="all">${defaultText}</option>`;
+        Array.from(items).sort().forEach(item => {
+          const opt = document.createElement('option'); opt.value = item; opt.innerText = item;
+          select.appendChild(opt);
+        });
+      };
+
+      populateDropdown('dateSelect', 'All Dates', uniqueDates);
+      populateDropdown('modelSelect', 'All Models', uniqueModels);
+      populateDropdown('loraSelect', 'All LoRAs', uniqueLoras);
+      populateDropdown('samplerSelect', 'All Samplers', uniqueSamplers);
+      populateDropdown('schedulerSelect', 'All Schedulers', uniqueSchedulers);
+
+      statusText.innerText = `${currentFolderImages.length} images`;
+    }
+
+    function applyFilters() {
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      const sDate = document.getElementById('dateSelect').value;
+      const sModel = document.getElementById('modelSelect').value;
+      const sLora = document.getElementById('loraSelect').value;
+      const sSampler = document.getElementById('samplerSelect').value;
+      const sScheduler = document.getElementById('schedulerSelect').value;
+      
+      currentFolderImages.forEach(img => {
+        const p = img.parsedData;
+        const matchesSearch = img.searchString.includes(searchTerm);
+        const matchesDate = sDate === 'all' || img.date === sDate;
+        const matchesModel = sModel === 'all' || p.modelName === sModel;
+        const matchesLora = sLora === 'all' || p.rawLorAs.includes(sLora);
+        const matchesSampler = sSampler === 'all' || p.sampler === sSampler;
+        const matchesScheduler = sScheduler === 'all' || p.scheduler === sScheduler;
+        
+        img.cardElement.style.display = (matchesSearch && matchesDate && matchesModel && matchesLora && matchesSampler && matchesScheduler) ? 'inline-block' : 'none';
+      });
+    }
+
+    ['searchInput', 'dateSelect', 'modelSelect', 'loraSelect', 'samplerSelect', 'schedulerSelect'].forEach(id => {
+      document.getElementById(id).addEventListener(id === 'searchInput' ? 'input' : 'change', applyFilters);
+    });
+
+    // Smart UI Updater for the right sidebar
+    function updateActionUI() {
+      const btnKeep = document.getElementById('btnKeep');
+      const btnTrash = document.getElementById('btnTrash');
+      const fileNameDisplay = document.getElementById('currentFileName');
+      const actionPanel = document.getElementById('fileActions');
+
+      if (selectedImages.size > 0) {
+        actionPanel.style.display = 'block';
+        fileNameDisplay.innerText = `${selectedImages.size} Images Selected`;
+        btnKeep.innerText = `⭐ Keep (${selectedImages.size})`;
+        btnTrash.innerText = `🗑️ Trash (${selectedImages.size})`;
+      } else if (currentFileHandle) {
+        actionPanel.style.display = 'block';
+        fileNameDisplay.innerText = currentFileHandle.name;
+        btnKeep.innerText = `⭐ Keep`;
+        btnTrash.innerText = `🗑️ Trash`;
+      } else {
+        actionPanel.style.display = 'none';
+      }
+    }
+
+    function selectImage(cardElement, imgData) {
+      document.querySelectorAll('.img-card').forEach(c => c.classList.remove('active'));
+      cardElement.classList.add('active');
+      currentFileHandle = imgData.fileHandle;
+      
+      updateActionUI();
+      
+      const p = imgData.parsedData;
+      const loraHTML = p.loraStrings.length > 0 ? p.loraStrings.map(l => `<div>• ${l}</div>`).join('') : 'None active';
+
+      document.getElementById('metaContent').innerHTML = `
+        <div class="meta-box"><div class="meta-label">Date Generated <span>${imgData.date}</span></div></div>
+        <div class="meta-box"><div class="meta-label">Model Checkpoint</div><div class="meta-value">${escapeHTML(p.modelName)}</div></div>
+        <div class="meta-box"><div class="meta-label">LoRAs Used</div><div class="meta-value" style="color:#58a6ff;">${loraHTML}</div></div>
+        <div class="meta-box">
+          <div class="meta-label">Positive Prompt <span class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('posTxt').innerText); this.innerText='Copied!'; setTimeout(()=>this.innerText='📋 Copy', 1500);">📋 Copy</span></div>
+          <div class="meta-value" id="posTxt">${escapeHTML(p.posText)}</div>
+        </div>
+        <div class="meta-box">
+          <div class="meta-label">Negative Prompt <span class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('negTxt').innerText); this.innerText='Copied!'; setTimeout(()=>this.innerText='📋 Copy', 1500);">📋 Copy</span></div>
+          <div class="meta-value" id="negTxt">${escapeHTML(p.negText)}</div>
+        </div>
+        <div class="meta-box">
+          <div class="meta-label">Generation Params <span class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('paramTxt').innerText); this.innerText='Copied!'; setTimeout(()=>this.innerText='📋 Copy', 1500);">📋 Copy</span></div>
+          <div class="meta-value" id="paramTxt">${p.sampler} / ${p.scheduler}\nSteps: ${p.steps} | CFG: ${p.cfg} | Seed: ${p.seed}</div>
+        </div>
+      `;
+    }
+
+    function parseCleanMetadata(promptObj) {
+      let result = { posText: "Not found", negText: "Not found", sampler: "Unknown", scheduler: "Unknown", steps: "?", cfg: "?", seed: "Unknown", modelName: "Unknown Model", loraStrings: [], rawLorAs: [] };
+      if (!promptObj) return result;
+      try {
+        Object.values(promptObj).forEach(node => {
+          if (node.class_type && node.class_type.includes('LoraLoader')) {
+            if (node.inputs && node.inputs.lora_name) {
+              const strength = node.inputs.strength_model || node.inputs.strength_clip || 1.0;
+              result.loraStrings.push(`${node.inputs.lora_name} (Strength: ${strength})`);
+              result.rawLorAs.push(node.inputs.lora_name);
+            }
+          }
+        });
+        let samplerNode = Object.values(promptObj).find(n => n.class_type?.includes('KSampler'));
+        if (samplerNode && samplerNode.inputs) {
+          result.sampler = samplerNode.inputs.sampler_name || "Unknown";
+          result.scheduler = samplerNode.inputs.scheduler || "Unknown";
+          result.steps = samplerNode.inputs.steps || "?";
+          result.cfg = samplerNode.inputs.cfg || "?";
+          result.seed = String(samplerNode.inputs.seed || "");
+          const posNodeId = samplerNode.inputs.positive?.[0];
+          if (posNodeId && promptObj[posNodeId]?.inputs?.text) result.posText = promptObj[posNodeId].inputs.text;
+          const negNodeId = samplerNode.inputs.negative?.[0];
+          if (negNodeId && promptObj[negNodeId]?.inputs?.text) result.negText = promptObj[negNodeId].inputs.text;
+          const modelNodeId = samplerNode.inputs.model?.[0];
+          if (modelNodeId && promptObj[modelNodeId]?.inputs?.ckpt_name) result.modelName = promptObj[modelNodeId].inputs.ckpt_name;
+        }
+      } catch (e) { console.error("Error parsing graph", e); }
+      return result;
+    }
+
+    async function extractComfyMetadata(file) {
+      const buffer = await file.arrayBuffer();
+      const view = new DataView(buffer);
+      let offset = 8, metadata = {};
+      while (offset < view.byteLength) {
+        const length = view.getUint32(offset);
+        const type = String.fromCharCode(view.getUint8(offset+4), view.getUint8(offset+5), view.getUint8(offset+6), view.getUint8(offset+7));
+        if (type === 'IEND') break; 
+        if (type === 'tEXt') {
+          const dataOffset = offset + 8;
+          let keyword = '', i = 0;
+          while (view.getUint8(dataOffset + i) !== 0) { keyword += String.fromCharCode(view.getUint8(dataOffset + i)); i++; }
+          const textBytes = new Uint8Array(buffer, dataOffset + i + 1, length - i - 1);
+          const text = new TextDecoder('utf-8').decode(textBytes);
+          if (keyword === 'prompt' || keyword === 'workflow') {
+            try { metadata[keyword] = JSON.parse(text); } catch(e) { metadata[keyword] = text; }
+          }
+        }
+        offset += 8 + length + 4; 
+      }
+      return metadata;
+    }
+
+    // New Bulk Action Engine
+    async function moveFiles(folderName) {
+      // Determine what to move: Bulk items first, otherwise the currently viewed item.
+      let targets = selectedImages.size > 0 
+        ? Array.from(selectedImages) 
+        : (currentFileHandle ? [currentFolderImages.find(i => i.fileHandle === currentFileHandle)] : []);
+      
+      if (targets.length === 0 || !rootDirHandle || !currentViewDirHandle) return;
+
+      try {
+        const targetDir = await rootDirHandle.getDirectoryHandle(folderName, { create: true });
+        
+        for (const img of targets) {
+          const newFileHandle = await targetDir.getFileHandle(img.fileHandle.name, { create: true });
+          const writable = await newFileHandle.createWritable();
+          const file = await img.fileHandle.getFile();
+          
+          await writable.write(file);
+          await writable.close();
+          await currentViewDirHandle.removeEntry(img.fileHandle.name);
+          
+          // Clean up DOM and memory
+          img.cardElement.remove();
+          currentFolderImages = currentFolderImages.filter(i => i.fileHandle.name !== img.fileHandle.name);
+        }
+        
+        // Reset states
+        const count = targets.length;
+        selectedImages.clear();
+        currentFileHandle = null;
+        updateActionUI();
+        document.getElementById('metaContent').innerHTML = `<div style="color: #8b949e; text-align: center; margin-top: 50px;">${count} file(s) moved successfully.</div>`;
+        
+      } catch (e) { alert("Failed to move files: " + e.message); }
+    }
+
+    document.getElementById('btnKeep').addEventListener('click', () => moveFiles('Keepers'));
+    document.getElementById('btnTrash').addEventListener('click', () => moveFiles('Trash'));
+  </script>
+</body>
+</html>
