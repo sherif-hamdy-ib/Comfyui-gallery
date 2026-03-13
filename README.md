@@ -1,7 +1,27 @@
-Create a new text file, copy/pastecode in the text file then save and change the extension to html.  
+ComfyUI Asset Manager Pro 📂✨
+A lightning-fast, zero-dependency, offline gallery and file manager for ComfyUI. No Python servers, no Node modules, no Electron bloat. Just double-click and organize.
 
-The gallery has a search bar, thumbnail size slider, and dropdown menus so you can filter your images by date, model, LoRa, Schedulers, Samplers.
+✨ Features
+Zero Bloat: 100% offline, single .html file.
 
-The Keep/Trash buttons do not modify the image in any way, if you select an image and click on "keep", a folder named "Keepers" will be created and the image will be moved there, same happens when you click "Trash", you can then delete the trash folder contents later after you review your images. 
+True File Management: Move images directly to Keepers or Trash folders on your hard drive.
 
-Every time you open the gallery file, you will need to select the root folder for your generated images, if your root folder has any subfolders containing images, they will be visible inside the trr-style file manager that will be visible in the left panel, so you can change folders quickly. The gallery is kinda self explanatory and fuss-free, but feel free to ask about anything, or suggest edits.
+Forensic Metadata: Automatically extracts prompts, LoRAs, Checkpoints, and generation params hidden inside ComfyUI PNGs.
+
+Instant Filtering: Memory-indexed search. Filter by Date, Model, LoRA, Sampler, Scheduler, or keyword with zero lag.
+
+Masonry Grid: Uncropped, responsive thumbnail layout that respects your aspect ratios.
+
+One-Click Copy: Rip positive/negative prompts straight to your clipboard.
+
+🛠️ How to Use
+Download the .html file and open it in your browser.
+
+Click "Select Root Folder" and choose your ComfyUI/output/ directory.
+
+Grant Permissions: When the browser asks to "View and Edit" files, click Allow. (This is required to actually move your files into Keepers/Trash).
+
+Start organizing.
+
+⚠️ Browser Requirements
+Use Chrome, Edge, Brave, or Opera. Firefox is strictly unsupported because Mozilla refuses to implement the local File System Access API. Blame them, not the code.
